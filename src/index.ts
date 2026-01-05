@@ -21,7 +21,7 @@ async function main() {
   
   if (coins.length === 0) {
     console.error('No coins found. Exiting.');
-    return;
+    return [];
   }
 
   // 2. Metrics for each coin
@@ -51,7 +51,8 @@ async function main() {
 
   if (referenceTimestamps.length === 0) {
     console.error('No metric data available. Exiting.');
-    return;
+    console.error('No metric data available. Exiting.');
+    return [];
   }
 
   // Apply Global Normalization
@@ -190,9 +191,17 @@ async function main() {
   } catch (err) {
       console.error('Failed to merge audio:', err);
   }
+  
+  return coins;
 }
 
-main().catch(err => {
-  console.error(err);
-  process.exit(1);
-});
+// Export main for pipeline
+export { main };
+
+// Only run if executed directly
+if (require.main === module) {
+  main().catch(err => {
+    console.error(err);
+    process.exit(1);
+  });
+}

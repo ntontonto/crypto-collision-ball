@@ -349,7 +349,7 @@ export class Renderer {
       ctx.textBaseline = 'middle';
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 64px sans-serif'; 
-      ctx.fillText("7 days crypto mood", width / 2, 80);
+      ctx.fillText("Which coin is best in 7 days?", width / 2, 80);
 
       // --- Leaderboard ---
       // Determine Top 2 Gainers in current 48h window
