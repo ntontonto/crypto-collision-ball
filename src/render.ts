@@ -10,6 +10,10 @@ export class Renderer {
   height: number;
   coinImages: Map<string, Image> = new Map();
 
+  // Smoothing state for Chart Y-axis
+  private smoothMinVal: number | null = null;
+  private smoothMaxVal: number | null = null;
+
   constructor() {
     this.width = config.width;
     this.height = config.height;
@@ -122,30 +126,90 @@ export class Renderer {
 
     // 1. Prepare Data
     const chartData = new Map<string, { x: number, y: number }[]>();
-    let minVal = 0;
-    let maxVal = 0;
+    let targetMin = 0;
+    let targetMax = 0;
+    let first = true;
     
     // Store valid coins for legend/colors
     const activeCoins: string[] = [];
 
     coinMetrics.forEach((series, id) => {
-        // Filter in window
+        // Filter in window (plus one point before to interpolate start if needed, but simple filter is ok for now)
+        // We actually want points *within* the window, plus we need to know the 'current price' at endTime.
+        
+        // Find points in range [startTime, endTime]
         const inWindow = series.filter(s => s.timestamp >= startTime && s.timestamp <= endTime);
-        if (inWindow.length < 2) return;
+        
+        // If no points in window, check if we have surround points to interpolate a straight line?
+        // Simplification: if < 1 point in window, try to use last known point.
+        // Actually, for smoothness, we need to interpolate the EXACT price at `endTime`.
+        
+        // Find indices around endTime
+        let pNextIdx = series.findIndex(s => s.timestamp > endTime);
+        let pPrevIdx = pNextIdx === -1 ? series.length - 1 : pNextIdx - 1;
+        
+        // Interpolate current price
+        let currentPrice = 0;
+        if (pPrevIdx >= 0 && series[pPrevIdx]) {
+            const pPrev = series[pPrevIdx];
+            if (pNextIdx !== -1 && series[pNextIdx]) {
+                const pNext = series[pNextIdx];
+                const ratio = (endTime - pPrev.timestamp) / (pNext.timestamp - pPrev.timestamp);
+                currentPrice = pPrev.price + (pNext.price - pPrev.price) * ratio;
+            } else {
+                currentPrice = pPrev.price; // Flat line extended
+            }
+        } else {
+            return; // No Data
+        }
+        
+        // Determine Base Price (price at startTime).
+        // Similar interpolation for startTime
+        let basePrice = 0;
+        let sNextIdx = series.findIndex(s => s.timestamp > startTime);
+        let sPrevIdx = sNextIdx === -1 ? series.length - 1 : sNextIdx - 1;
+        
+        if (sPrevIdx >= 0 && series[sPrevIdx]) {
+             const sPrev = series[sPrevIdx];
+             if (sNextIdx !== -1 && series[sNextIdx]) {
+                 const sNext = series[sNextIdx];
+                 const ratio = (startTime - sPrev.timestamp) / (sNext.timestamp - sPrev.timestamp);
+                 basePrice = sPrev.price + (sNext.price - sPrev.price) * ratio;
+             } else {
+                 basePrice = sPrev.price;
+             }
+        } else if (sNextIdx !== -1) {
+            // Started after startTime
+            basePrice = series[sNextIdx].price;
+        } else {
+            return;
+        }
 
-        // Base price is the price at START of WINDOW (or first available point in window)
-        const basePrice = inWindow[0].price;
-        if (!basePrice) return;
+        if (basePrice === 0) return;
 
-        const points = inWindow.map(s => {
+        // Construct points: Existing known points in window + Current Head
+        const rawPoints = inWindow; 
+        
+        // Normalize
+        const points = rawPoints.map(s => {
             const timePct = (s.timestamp - startTime) / windowMs;
             const valPct = (s.price - basePrice) / basePrice;
             return { x: timePct, y: valPct };
         });
+        
+        // Add Head Point
+        points.push({ x: 1.0, y: (currentPrice - basePrice) / basePrice });
 
+        // Update Min/Max
         points.forEach(p => {
-           if (p.y < minVal) minVal = p.y;
-           if (p.y > maxVal) maxVal = p.y;
+           if (first) {
+             targetMin = p.y;
+             targetMax = p.y;
+             first = false;
+           } else {
+             if (p.y < targetMin) targetMin = p.y;
+             if (p.y > targetMax) targetMax = p.y;
+           }
         });
 
         chartData.set(id, points);
@@ -153,15 +217,28 @@ export class Renderer {
     });
     
     // Add padding to Y range
-    const yRange = maxVal - minVal;
+    const yRange = targetMax - targetMin;
     if (yRange < 0.04) {
-        const center = (minVal + maxVal) / 2;
-        minVal = center - 0.02;
-        maxVal = center + 0.02;
+        const center = (targetMin + targetMax) / 2;
+        targetMin = center - 0.02;
+        targetMax = center + 0.02;
     } else {
-        minVal -= yRange * 0.1;
-        maxVal += yRange * 0.1;
+        targetMin -= yRange * 0.1;
+        targetMax += yRange * 0.1;
     }
+    
+    // Smoothing (Damping)
+    if (this.smoothMinVal === null || this.smoothMaxVal === null) {
+        this.smoothMinVal = targetMin;
+        this.smoothMaxVal = targetMax;
+    } else {
+        const alpha = 0.1; // Smoothing factor
+        this.smoothMinVal = this.smoothMinVal + (targetMin - this.smoothMinVal) * alpha;
+        this.smoothMaxVal = this.smoothMaxVal + (targetMax - this.smoothMaxVal) * alpha;
+    }
+    
+    const minVal = this.smoothMinVal;
+    const maxVal = this.smoothMaxVal;
     
     // 2. Draw Background
     ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
