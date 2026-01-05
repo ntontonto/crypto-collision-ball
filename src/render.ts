@@ -72,8 +72,9 @@ export class Renderer {
 
     // 3. Draw Explicit Box
     // Physics: boxMargin = 60, boxTop = 400
+    // Physics: boxMargin = 60, boxTop = 280
     const boxMargin = 60;
-    const boxTop = 400;
+    const boxTop = 280;
     const boxInnerWidth = width - 2 * boxMargin;
     const boxHeight = boxInnerWidth; // Square
     
@@ -131,7 +132,7 @@ export class Renderer {
     currentDate: Date
   ) {
     const margin = 60; // Align with box margins
-    const chartY = 1420;
+    const chartY = 1300;
     const chartHeight = 400; 
     const chartWidth = this.width - 2 * margin;
 
@@ -390,7 +391,7 @@ export class Renderer {
           const itemCenterY = rowY;
 
           // 1. Draw Medal (Left)
-          const medalX = x - 60;
+          const medalX = x - 85; 
           if (medalImg) {
               const medalR = 32;
               const targetHeight = medalR * 2.4;

@@ -20,13 +20,14 @@ export class PhysicsWorld {
   width: number;
   height: number;
   coinBodies: Map<string, CoinBody> = new Map();
+  collisionEvents: { type: 'coin' | 'wall', velocity: number }[] = [];
   
   // Date slider margin
   topMargin = 200; // UI area
   
   // Explicit box definition
   readonly boxMargin = 60; // Side/Bottom margin
-  readonly boxTop = 400;   // Top of the box (Lowered for time bar)
+  readonly boxTop = 280;   // Top of the box (Lowered for time bar)
   // Box dimensions:
   // x: boxMargin ... width - boxMargin
   // y: boxTop ... boxTop + (width - 2*boxMargin) [Square]
@@ -89,6 +90,47 @@ export class PhysicsWorld {
     );
 
     Matter.World.add(this.engine.world, [topWall, bottomWall, leftWall, rightWall]);
+
+    // Collision Detection for Audio
+    Matter.Events.on(this.engine, 'collisionStart', (event) => {
+        event.pairs.forEach(pair => {
+            const bodyA = pair.bodyA;
+            const bodyB = pair.bodyB;
+
+            // Check if one is Static (Wall) and other is Coin
+            // We set isStatic: true for walls. 
+            // Coins have label = coinId.
+            const isWallA = bodyA.isStatic;
+            const isWallB = bodyB.isStatic;
+
+            // Calculate Impact Velocity
+            // Matter.js doesn't give easy impact velocity in collisionStart, 
+            // but we can approximate using relative velocity
+            const vA = bodyA.velocity;
+            const vB = bodyB.velocity;
+            const relVel = Matter.Vector.sub(vA, vB);
+            const speed = Matter.Vector.magnitude(relVel);
+
+            // Filter low speed bumps
+            if (speed < 1.0) return;
+
+            if (isWallA || isWallB) {
+                // Wall Hit
+                // Only trigger if other is non-static (Coin)
+                if (isWallA && !isWallB) this.collisionEvents.push({ type: 'wall', velocity: speed });
+                if (!isWallA && isWallB) this.collisionEvents.push({ type: 'wall', velocity: speed });
+            } else {
+                // Coin Hit
+                this.collisionEvents.push({ type: 'coin', velocity: speed });
+            }
+        });
+    });
+  }
+
+  consumeCollisionEvents() {
+      const events = [...this.collisionEvents];
+      this.collisionEvents = [];
+      return events;
   }
 
   setupCoins(ids: string[]) {
