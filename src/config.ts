@@ -27,7 +27,7 @@ export const config: Config = {
   vsCurrency: args.vs_currency || 'usd',
   days: args.days || 30,
   windowHours: args.window_hours || 48,
-  durationSec: args.duration_sec || 30,
+  durationSec: args.duration_sec || 35,
   fps: args.fps || 30,
   width: args.width || 1080,
   height: args.height || 1920,

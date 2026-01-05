@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
-    "generate": "ts-node src/index.ts"
+    "generate": "ts-node src/index.ts",
+    "automate": "ts-node src/pipeline.ts"
   },
   "repository": {
     "type": "git",
@@ -25,6 +26,8 @@
     "dotenv": "^17.2.3",
     "fluent-ffmpeg": "^2.1.3",
     "fs-extra": "^11.3.3",
+    "google-auth-library": "^10.5.0",
+    "googleapis": "^169.0.0",
     "matter-js": "^0.20.0",
     "minimist": "^1.2.8"
   },

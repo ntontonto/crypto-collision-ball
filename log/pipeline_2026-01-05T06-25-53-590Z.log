@@ -1,0 +1,15 @@
+[2026-01-05T06:25:53.598Z] [INFO] Logger initialized for Pipeline
+[2026-01-05T06:25:53.599Z] [INFO] Starting Automation Pipeline...
+[2026-01-05T06:25:53.599Z] [INFO] Step 1: Metric Fetch & Video Generation
+[2026-01-05T06:26:56.867Z] [INFO] Video generation complete.
+[2026-01-05T06:26:56.871Z] [INFO] Step 2: Upload to YouTube
+[2026-01-05T06:26:56.872Z] [INFO] Initializing YouTube Upload...
+[2026-01-05T06:26:56.878Z] [INFO] Loaded credentials from token.json
+[2026-01-05T06:26:56.881Z] [INFO] Title: Crypto Mood 2026-01-05: Bitcoin & Market Trends | Physics Simulation #Shorts #Crypto
+[2026-01-05T06:26:56.882Z] [INFO] Uploading video: /Users/kentosaito/Documents/git/crypto-collision-ball/output/crypto-mood-final.mp4 (2.02 MB)
+[2026-01-05T06:27:00.999Z] [INFO] Upload complete! Video ID: ozb6lDkME30
+[2026-01-05T06:27:01.001Z] [INFO] Step 3: Cleanup
+[2026-01-05T06:27:01.002Z] [INFO] Deleted: audio.pcm
+[2026-01-05T06:27:01.002Z] [INFO] Deleted: crypto-mood-final.mp4
+[2026-01-05T06:27:01.003Z] [INFO] Deleted: crypto-mood.mp4
+[2026-01-05T06:27:01.003Z] [INFO] Pipeline finished successfully.
