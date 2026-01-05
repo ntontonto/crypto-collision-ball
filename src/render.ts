@@ -9,6 +9,8 @@ export class Renderer {
   width: number;
   height: number;
   coinImages: Map<string, Image> = new Map();
+  coinSymbols: Map<string, string> = new Map();
+  medalImages: Map<string, Image> = new Map();
 
   // Smoothing state for Chart Y-axis
   private smoothMinVal: number | null = null;
@@ -21,16 +23,25 @@ export class Renderer {
     this.ctx = this.canvas.getContext('2d');
   }
 
-  async loadAssets(coins: { id: string; image: string }[]) {
+  async loadAssets(coins: { id: string; image: string; symbol: string }[]) {
     console.log('Loading coin images...');
     for (const coin of coins) {
       try {
         const img = await loadImage(coin.image);
         this.coinImages.set(coin.id, img);
+        this.coinSymbols.set(coin.id, coin.symbol.toUpperCase());
       } catch (err) {
         console.error(`Failed to load image for ${coin.id}:`, err);
         // Fallback or skip?
       }
+    }
+
+    // Load Medals
+    try {
+        this.medalImages.set('gold', await loadImage('assets/images/medals/gold_medal.png'));
+        this.medalImages.set('silver', await loadImage('assets/images/medals/silver_medal.png'));
+    } catch (err) {
+        console.error('Failed to load medal images:', err);
     }
   }
 
@@ -51,8 +62,13 @@ export class Renderer {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
-    // 2. Date Slider & Header
-    this.drawDateSlider(ctx, currentDate, startDate, endDate, 280);
+    // 2. Header
+    if (coinMetrics) {
+        this.drawHeader(ctx, coinMetrics, currentDate);
+    }
+
+    // 2. Date Slider & Header (Removed)
+    // this.drawDateSlider(ctx, currentDate, startDate, endDate, 280);
 
     // 3. Draw Explicit Box
     // Physics: boxMargin = 60, boxTop = 400
@@ -310,61 +326,119 @@ export class Renderer {
     ctx.textAlign = 'right';
     ctx.fillText(`${(maxVal*100).toFixed(0)}%`, margin - 10, chartY + 24);
     ctx.fillText(`${(minVal*100).toFixed(0)}%`, margin - 10, chartY + chartHeight);
-  }
 
-  drawDateSlider(
-    ctx: any, 
-    currentDate: Date, 
-    startDate: Date, 
-    endDate: Date,
-    boxTop: number
-  ) {
-    const width = this.width;
-    const height = 160; 
-    const pad = 40;
-    const barY = 150; // Lowered from 60
-    const barWidth = width - 2 * pad;
-    const barHeight = 6;
-
-    // Axis line
-    ctx.fillStyle = '#555';
-    ctx.fillRect(pad, barY, barWidth, barHeight);
-
-    // Calculate progression 0..1
-    const totalMs = endDate.getTime() - startDate.getTime();
-    const currentMs = currentDate.getTime() - startDate.getTime();
-    const progress = Math.max(0, Math.min(1, currentMs / totalMs));
-    
-    // Window width (48h relative to 30d)
-    const windowMs = 48 * 60 * 60 * 1000;
-    const windowRatio = windowMs / totalMs;
-    const winWidthPx = Math.max(2, windowRatio * barWidth);
-    
-    const winX = pad + progress * (barWidth - winWidthPx);
-    
-    // Draw window
-    ctx.fillStyle = 'rgba(100, 200, 255, 0.3)';
-    ctx.fillRect(winX, barY - 20, winWidthPx, 46);
-    ctx.strokeStyle = 'rgba(100, 200, 255, 0.8)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(winX, barY - 20, winWidthPx, 46);
-
-    // Current Timestamp Text
-    ctx.fillStyle = '#fff';
-    ctx.font = '32px monospace';
+    // Label X-axis (Date) - Right Only
     ctx.textAlign = 'right';
-    const timeStr = currentDate.toISOString().replace('T', ' ').substring(0, 16);
-    ctx.fillText(timeStr, width - pad, barY + 60);
-
-    // Start/End Dates Labels
     ctx.font = '20px sans-serif';
-    ctx.fillStyle = '#888';
-    ctx.textAlign = 'left';
-    ctx.fillText(startDate.toISOString().substring(0, 10), pad, barY + 30);
-    ctx.textAlign = 'right';
-    ctx.fillText(endDate.toISOString().substring(0, 10), width - pad, barY + 30);
+    const dateStr = currentDate.toLocaleString('en-US', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '');
+    ctx.fillText(dateStr, margin + chartWidth, chartY + chartHeight + 25);
   }
 
+
+  drawHeader(
+    ctx: CanvasRenderingContext2D,
+    coinMetrics: Map<string, MetricSeries[]>,
+    currentDate: Date
+  ) {
+      const headerH = 280;
+      const width = this.width;
+
+      // Title
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 64px sans-serif'; 
+      ctx.fillText("7 days crypto mood", width / 2, 80);
+
+      // --- Leaderboard ---
+      // Determine Top 2 Gainers in current 48h window
+      // We reuse logic from Chart to find relative performance.
+      const windowMs = 48 * 60 * 60 * 1000;
+      const endTime = currentDate.getTime();
+      const startTime = endTime - windowMs;
+
+      const performance: { id: string, gain: number }[] = [];
+
+      coinMetrics.forEach((series, id) => {
+          // Get End Price (interpolate)
+          const pEnd = this.getInterpPrice(series, endTime);
+          const pStart = this.getInterpPrice(series, startTime);
+          
+          if (pStart > 0 && pEnd > 0) {
+              const gain = (pEnd - pStart) / pStart;
+              performance.push({ id, gain });
+          }
+      });
+
+      // Sort Descending
+      performance.sort((a, b) => b.gain - a.gain);
+      const top2 = performance.slice(0, 2);
+
+      // Draw Top 2
+      const rowY = 180;
+      const gapX = 350; // Distance between Gold and Silver
+      const centerX = width / 2;
+
+      top2.forEach((item, index) => {
+          const x = centerX + (index === 0 ? -gapX/2 : gapX/2);
+          const rank = index + 1;
+          const symbol = this.coinSymbols.get(item.id) || item.id;
+          const img = this.coinImages.get(item.id);
+          const medalImg = index === 0 ? this.medalImages.get('gold') : this.medalImages.get('silver');
+
+          // Common Center Y for this item
+          const itemCenterY = rowY;
+
+          // 1. Draw Medal (Left)
+          const medalX = x - 60;
+          if (medalImg) {
+              const medalR = 32;
+              const targetHeight = medalR * 2.4;
+              const ratio = medalImg.width / medalImg.height;
+              const targetWidth = targetHeight * ratio;
+              
+              ctx.drawImage(
+                  medalImg, 
+                  medalX - targetWidth / 2, 
+                  itemCenterY - targetHeight / 2, 
+                  targetWidth, 
+                  targetHeight
+              );
+          }
+
+          // 2. Draw Coin Icon (Center)
+          const iconSize = 64;
+          if (img) {
+              ctx.save();
+              ctx.beginPath();
+              ctx.arc(x, itemCenterY, iconSize/2, 0, Math.PI*2);
+              ctx.clip();
+              ctx.drawImage(img, x - iconSize/2, itemCenterY - iconSize/2, iconSize, iconSize);
+              ctx.restore();
+          }
+
+          // 3. Draw Ticker (Right)
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle'; 
+          ctx.font = 'bold 48px sans-serif';
+          ctx.fillStyle = '#fff';
+          ctx.fillText(symbol, x + 50, itemCenterY + 2); // +2 for visual optical balancing
+      });
+  }
+
+  // Helper for basic linear interpolation
+  private getInterpPrice(series: MetricSeries[], time: number): number {
+      if (series.length === 0) return 0;
+      // Find index after time
+      const idx = series.findIndex(s => s.timestamp > time);
+      if (idx === -1) return series[series.length - 1].price; // After all data
+      if (idx === 0) return series[0].price; // Before all data
+      
+      const pNext = series[idx];
+      const pPrev = series[idx - 1];
+      const ratio = (time - pPrev.timestamp) / (pNext.timestamp - pPrev.timestamp);
+      return pPrev.price + (pNext.price - pPrev.price) * ratio;
+  }
   getBuffer() {
     return this.canvas.toBuffer('image/png');
   }
