@@ -4,6 +4,12 @@ import { computeMetricSeries, normalizeAllSeries, MetricSeries } from './metrics
 import { PhysicsWorld } from './physics';
 import { Renderer } from './render';
 import { VideoEncoder } from './video';
+import { AudioMixer } from './audio';
+import path from 'path';
+import { exec } from 'child_process';
+import util from 'util';
+
+const execPromise = util.promisify(exec);
 
 async function main() {
   console.log('Starting Crypto Mood Video Generator...');
@@ -60,9 +66,11 @@ async function main() {
   const world = new PhysicsWorld();
   const renderer = new Renderer();
   const videoEncoder = new VideoEncoder();
+  const audioMixer = new AudioMixer(config.durationSec);
 
-  // Load images
+  // Load images & audio
   await renderer.loadAssets(coins);
+  await audioMixer.loadAssets();
 
   // Add coins to world
   // Only add coins that we have metrics for
@@ -129,6 +137,19 @@ async function main() {
     // We step the physics world by 1000/30 ms (approx 33ms)
     world.update(dtMs, currentMetrics);
 
+    // Audio Events
+    const events = world.consumeCollisionEvents();
+    const timeSec = f / config.fps;
+    events.forEach(e => {
+        // Volume logic: velocity 1.0 (min) to ~20.0 (max)
+        // Logarithmic-ish scaling? Linear for now.
+        const volume = Math.min(1.0, e.velocity / 15.0);
+        if (volume > 0.05) {
+            // User requested same sound for wall and coin
+            audioMixer.addEvent(timeSec, 'coin', volume);
+        }
+    });
+
     // Render
     renderer.renderFrame(
         world, 
@@ -149,7 +170,26 @@ async function main() {
 
   // Finish
   await videoEncoder.finish();
-  console.log('Done.');
+  
+  // Export Audio
+  const audioPath = path.join(config.outputDir, 'audio.pcm');
+  await audioMixer.export(audioPath);
+
+  // Merge Video + Audio
+  console.log('Merging Audio and Video...');
+  const videoPath = path.join(config.outputDir, 'crypto-mood.mp4');
+  const finalPath = path.join(config.outputDir, 'crypto-mood-final.mp4');
+
+  // FFmpeg command: Input Video + Input raw PCM (f32le) -> Output MP4 (AAC)
+  // -map 0:v -map 1:a ensures we take video from input 0 and audio from input 1
+  const cmd = `ffmpeg -y -i "${videoPath}" -f f32le -ar 44100 -ac 1 -i "${audioPath}" -c:v copy -c:a aac -b:a 192k -map 0:v -map 1:a "${finalPath}"`;
+  
+  try {
+      await execPromise(cmd);
+      console.log('Done. Final video:', finalPath);
+  } catch (err) {
+      console.error('Failed to merge audio:', err);
+  }
 }
 
 main().catch(err => {
