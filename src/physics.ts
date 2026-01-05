@@ -11,6 +11,7 @@ export interface CoinBody {
   hopFrameCount: number;
   hopForceMagnitude: number;
   hopAngle: number;
+  isStunned: boolean;
 }
 
 export class PhysicsWorld {
@@ -143,7 +144,8 @@ export class PhysicsWorld {
           isHopping: false,
           hopFrameCount: 0,
           hopForceMagnitude: 0,
-          hopAngle: 0
+          hopAngle: 0,
+          isStunned: false
       });
       Matter.World.add(this.engine.world, body);
     });
@@ -189,6 +191,29 @@ export class PhysicsWorld {
       // C. Periodic Hop
       // Logic: Wait for interval -> Start hopping -> Apply force for N frames -> Stop applying -> Decelerate (friction)
       
+      // Calculate speed for Stun mechanic
+      const currentSpeed = Matter.Vector.magnitude(cb.body.velocity);
+      const STUN_VELOCITY = 15.0; // If faster than this, get stunned
+      const RECOVERY_VELOCITY = 1.0; // If slower than this, recover
+
+      // Stun Logic
+      if (cb.isStunned) {
+          if (currentSpeed < RECOVERY_VELOCITY) {
+              cb.isStunned = false; // Recovered
+          } else {
+              // Still stunned, skip hopping
+              cb.isHopping = false;
+              return; 
+          }
+      } else {
+          // Check if we should be stunned
+          if (currentSpeed > STUN_VELOCITY) {
+              cb.isStunned = true;
+              cb.isHopping = false;
+              return;
+          }
+      }
+
       // Calculate Sharpe Ratio (Trend / Volatility)
       // High Sharpe = Stable Growth (Trend > 0, Vol Low) -> Strong Hop, Long Interval
       // Low Sharpe = Unstable/Decline (Trend < 0 or Trend~0, Vol High) -> Weak Hop, Short Interval
