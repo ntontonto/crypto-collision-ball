@@ -27,7 +27,7 @@ export class PhysicsWorld {
   
   // Explicit box definition
   readonly boxMargin = 60; // Side/Bottom margin
-  readonly boxTop = 280;   // Top of the box (Lowered for time bar)
+  readonly boxTop = 380;   // Top of the box (Lowered for time bar)
   // Box dimensions:
   // x: boxMargin ... width - boxMargin
   // y: boxTop ... boxTop + (width - 2*boxMargin) [Square]

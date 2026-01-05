@@ -74,7 +74,7 @@ export class Renderer {
     // Physics: boxMargin = 60, boxTop = 400
     // Physics: boxMargin = 60, boxTop = 280
     const boxMargin = 60;
-    const boxTop = 280;
+    const boxTop = 380;
     const boxInnerWidth = width - 2 * boxMargin;
     const boxHeight = boxInnerWidth; // Square
     
@@ -132,7 +132,7 @@ export class Renderer {
     currentDate: Date
   ) {
     const margin = 60; // Align with box margins
-    const chartY = 1300;
+    const chartY = 1400;
     const chartHeight = 400; 
     const chartWidth = this.width - 2 * margin;
 
@@ -261,6 +261,13 @@ export class Renderer {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
     ctx.fillRect(margin, chartY, chartWidth, chartHeight);
     
+    // Draw Date Label (Inside Chart, Top-Left)
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.font = 'bold 24px sans-serif'; 
+    const dateStr = currentDate.toLocaleString('en-US', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '');
+    ctx.fillText(dateStr, margin + 20, chartY + 40);
+    
     // Zero line
     if (minVal < 0 && maxVal > 0) {
         const zeroY = chartY + chartHeight - (0 - minVal) / (maxVal - minVal) * chartHeight;
@@ -327,12 +334,6 @@ export class Renderer {
     ctx.textAlign = 'right';
     ctx.fillText(`${(maxVal*100).toFixed(0)}%`, margin - 10, chartY + 24);
     ctx.fillText(`${(minVal*100).toFixed(0)}%`, margin - 10, chartY + chartHeight);
-
-    // Label X-axis (Date) - Right Only
-    ctx.textAlign = 'right';
-    ctx.font = '20px sans-serif';
-    const dateStr = currentDate.toLocaleString('en-US', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '');
-    ctx.fillText(dateStr, margin + chartWidth, chartY + chartHeight + 25);
   }
 
 
@@ -349,7 +350,7 @@ export class Renderer {
       ctx.textBaseline = 'middle';
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 64px sans-serif'; 
-      ctx.fillText("Which coin is best in 7 days?", width / 2, 80);
+      ctx.fillText("Which coin is best in 7 days?", width / 2, 180);
 
       // --- Leaderboard ---
       // Determine Top 2 Gainers in current 48h window
@@ -376,7 +377,7 @@ export class Renderer {
       const top2 = performance.slice(0, 2);
 
       // Draw Top 2
-      const rowY = 180;
+      const rowY = 280;
       const gapX = 350; // Distance between Gold and Silver
       const centerX = width / 2;
 
